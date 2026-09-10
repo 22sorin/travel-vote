@@ -129,18 +129,16 @@
       </div>
 
       <section class="manage-area" aria-label="투표 관리">
-        <div id="own-vote-card" class="manage-card" hidden>
+        <div id="own-vote-card" class="manage-card">
           <div>
             <p class="eyebrow">MY VOTE</p>
-            <h2>내 투표 관리</h2>
-            <p>이 기기에서 만든 투표를 삭제할 수 있습니다. 기기를 바꾸면 아래 투표번호가 필요합니다.</p>
-          </div>
-          <div class="vote-id-box">
-            <label for="own-vote-id">투표번호</label>
-            <div><input id="own-vote-id" readonly /><button id="copy-vote-id" type="button">복사</button></div>
+            <h2>내 투표 삭제</h2>
+            <p>투표할 때 사용한 이름과 비밀번호를 입력하면 본인 투표를 삭제할 수 있습니다.</p>
           </div>
           <form id="own-delete-form" class="inline-form">
+            <label for="own-delete-name">투표한 이름</label>
             <label for="own-delete-password">삭제용 비밀번호</label>
+            <input id="own-delete-name" type="text" maxlength="40" required autocomplete="name" />
             <input id="own-delete-password" type="password" minlength="4" maxlength="72" required autocomplete="current-password" />
             <button class="outline-button" type="submit">내 투표 삭제</button>
           </form>

@@ -100,16 +100,19 @@ Deno.serve(async (request) => {
     return response({ voteId: result.data }, 201, cors);
   }
 
-  const voteId = body.voteId;
   const password = typeof body.password === "string" ? body.password : "";
-  if (!isUuid(voteId) || !password) return response({ error: "투표번호와 비밀번호를 확인해 주세요." }, 400, cors);
 
   if (action === "delete-own") {
-    const result = await supabase.rpc("delete_vote_by_password", { p_vote_id: voteId, p_password: password });
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    if (!name || !password) return response({ error: "투표한 이름과 비밀번호를 확인해 주세요." }, 400, cors);
+    const result = await supabase.rpc("delete_vote_by_name_and_password", { p_name: name, p_password: password });
     if (result.error) return response({ error: "삭제 요청을 처리하지 못했습니다." }, 500, cors);
-    if (!result.data) return response({ error: "투표번호 또는 비밀번호가 일치하지 않습니다." }, 403, cors);
+    if (!result.data) return response({ error: "이름 또는 비밀번호가 일치하지 않습니다." }, 403, cors);
     return response({ deleted: true }, 200, cors);
   }
+
+  const voteId = body.voteId;
+  if (!isUuid(voteId) || !password) return response({ error: "투표번호와 비밀번호를 확인해 주세요." }, 400, cors);
 
   if (!bcrypt.compareSync(password, masterPasswordHash)) {
     return response({ error: "마스터 비밀번호가 일치하지 않습니다." }, 403, cors);

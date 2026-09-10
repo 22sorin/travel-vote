@@ -13,8 +13,8 @@ const elements = {
   loverPercent: $("#lover-percent"), otherPercent: $("#other-percent"), loverRatio: $("#lover-ratio"), otherRatio: $("#other-ratio"),
   loverBar: $("#lover-bar"), otherBar: $("#other-bar"), updatedAt: $("#updated-at"),
   peopleCount: $("#people-count"), participantList: $("#participant-list"), emptyPeople: $("#empty-participants"),
-  voteForm: $("#vote-form"), voteMessage: $("#vote-message"), ownCard: $("#own-vote-card"), ownVoteId: $("#own-vote-id"),
-  ownDeleteForm: $("#own-delete-form"), ownDeleteMessage: $("#own-delete-message"), copyVoteId: $("#copy-vote-id"),
+  voteForm: $("#vote-form"), voteMessage: $("#vote-message"), ownCard: $("#own-vote-card"),
+  ownDeleteForm: $("#own-delete-form"), ownDeleteMessage: $("#own-delete-message"),
   adminConsole: $("#admin-console"), adminForm: $("#admin-delete-form"), adminVoteId: $("#admin-vote-id"), adminMessage: $("#admin-message"), template: $("#participant-template"),
 };
 
@@ -26,17 +26,6 @@ function setMessage(target, text = "", type = "") {
 function setButtonBusy(button, busy, idleText) {
   button.disabled = busy;
   button.textContent = busy ? "처리 중…" : idleText;
-}
-
-function safeStoredVoteId() {
-  const value = localStorage.getItem("travel-vote.own-vote-id");
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value ?? "") ? value : "";
-}
-
-function showOwnVote(id = safeStoredVoteId()) {
-  if (!id) return;
-  elements.ownCard.hidden = false;
-  elements.ownVoteId.value = id;
 }
 
 function formatUpdatedAt(value) {
@@ -155,9 +144,8 @@ elements.voteForm.addEventListener("submit", async (event) => {
   setButtonBusy(button, true, "투표하기 →");
   setMessage(elements.voteMessage);
   try {
-    const result = await callVoteApi({ action: "create", name, gender, password });
-    localStorage.setItem("travel-vote.own-vote-id", result.voteId);
-    showOwnVote(result.voteId);
+    await callVoteApi({ action: "create", name, gender, password });
+    $("#own-delete-name").value = name;
     elements.voteForm.reset();
     setMessage(elements.voteMessage, "투표가 반영됐어요. 투표번호는 꼭 보관해 주세요.", "success");
   } catch (error) {
@@ -169,14 +157,14 @@ elements.voteForm.addEventListener("submit", async (event) => {
 
 elements.ownDeleteForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  const name = $("#own-delete-name").value.trim();
   const password = $("#own-delete-password").value;
-  const id = elements.ownVoteId.value;
+  if (!name || password.length < 4) return setMessage(elements.ownDeleteMessage, "투표한 이름과 4자 이상의 비밀번호를 입력해 주세요.", "error");
   const button = elements.ownDeleteForm.querySelector("button");
   setButtonBusy(button, true, "내 투표 삭제");
   try {
-    await callVoteApi({ action: "delete-own", voteId: id, password });
-    localStorage.removeItem("travel-vote.own-vote-id");
-    elements.ownCard.hidden = true;
+    await callVoteApi({ action: "delete-own", name, password });
+    $("#own-delete-name").value = "";
     $("#own-delete-password").value = "";
     setMessage(elements.ownDeleteMessage, "내 투표를 삭제했습니다.", "success");
   } catch (error) {
@@ -204,19 +192,7 @@ elements.adminForm.addEventListener("submit", async (event) => {
   }
 });
 
-elements.copyVoteId.addEventListener("click", async () => {
-  try {
-    await navigator.clipboard.writeText(elements.ownVoteId.value);
-    elements.copyVoteId.textContent = "복사됨";
-    setTimeout(() => { elements.copyVoteId.textContent = "복사"; }, 1300);
-  } catch {
-    elements.ownVoteId.select();
-    document.execCommand("copy");
-  }
-});
-
 async function init() {
-  showOwnVote();
   elements.adminConsole.hidden = !adminMode;
   if (!configured) {
     elements.setupNote.hidden = false;

@@ -1,10 +1,19 @@
--- Public data is deliberately limited to voter name, gender, and timestamp.
--- Password hashes stay in public.votes, a table with no anon/authenticated access.
+-- Safe recovery for a partially applied manual setup.
+-- This does not delete votes. It creates missing objects and refreshes the public feed/statistics.
 create extension if not exists pgcrypto with schema extensions;
 
-create type public.vote_gender as enum ('lover', 'cd', 'mtf', 'tg');
+do $$
+begin
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+    where n.nspname = 'public' and t.typname = 'vote_gender'
+  ) then
+    create type public.vote_gender as enum ('lover', 'cd', 'mtf', 'tg');
+  end if;
+end;
+$$;
 
-create table public.votes (
+create table if not exists public.votes (
   id uuid primary key default gen_random_uuid(),
   voter_name text not null check (char_length(voter_name) between 1 and 40),
   gender public.vote_gender not null,
@@ -12,21 +21,21 @@ create table public.votes (
   created_at timestamptz not null default now()
 );
 
-create table public.vote_feed (
+create table if not exists public.vote_feed (
   id uuid primary key references public.votes(id) on delete cascade,
   voter_name text not null,
   gender public.vote_gender not null,
   created_at timestamptz not null
 );
 
-create table public.vote_stats (
+create table if not exists public.vote_stats (
   id smallint primary key default 1 check (id = 1),
   lover_count integer not null default 0 check (lover_count >= 0),
   other_count integer not null default 0 check (other_count >= 0),
   updated_at timestamptz not null default now()
 );
 
-create table public.vote_rate_limits (
+create table if not exists public.vote_rate_limits (
   bucket text not null check (bucket in ('create', 'delete')),
   identifier_hash text not null check (char_length(identifier_hash) = 64),
   window_started_at timestamptz not null default now(),
@@ -34,7 +43,7 @@ create table public.vote_rate_limits (
   primary key (bucket, identifier_hash)
 );
 
-insert into public.vote_stats (id) values (1);
+insert into public.vote_stats (id) values (1) on conflict (id) do nothing;
 
 create or replace function public.add_vote_feed_and_stats()
 returns trigger
@@ -44,7 +53,8 @@ set search_path = public, pg_catalog, pg_temp
 as $$
 begin
   insert into public.vote_feed (id, voter_name, gender, created_at)
-  values (new.id, new.voter_name, new.gender, new.created_at);
+  values (new.id, new.voter_name, new.gender, new.created_at)
+  on conflict (id) do nothing;
 
   update public.vote_stats
   set lover_count = lover_count + case when new.gender = 'lover' then 1 else 0 end,
@@ -71,15 +81,28 @@ begin
 end;
 $$;
 
-create trigger after_vote_insert
-after insert on public.votes
-for each row execute function public.add_vote_feed_and_stats();
+do $$
+begin
+  if not exists (
+    select 1 from pg_trigger
+    where tgrelid = 'public.votes'::regclass and tgname = 'after_vote_insert' and not tgisinternal
+  ) then
+    create trigger after_vote_insert
+    after insert on public.votes
+    for each row execute function public.add_vote_feed_and_stats();
+  end if;
 
-create trigger after_vote_delete
-after delete on public.votes
-for each row execute function public.subtract_vote_stats();
+  if not exists (
+    select 1 from pg_trigger
+    where tgrelid = 'public.votes'::regclass and tgname = 'after_vote_delete' and not tgisinternal
+  ) then
+    create trigger after_vote_delete
+    after delete on public.votes
+    for each row execute function public.subtract_vote_stats();
+  end if;
+end;
+$$;
 
--- Only the Edge Function uses these RPCs with the service-role key.
 create or replace function public.submit_vote(
   p_name text,
   p_gender public.vote_gender,
@@ -189,25 +212,32 @@ begin
 
   select * into existing from public.vote_rate_limits
   where bucket = p_bucket and identifier_hash = p_identifier_hash for update;
-
   if not found then
     insert into public.vote_rate_limits (bucket, identifier_hash) values (p_bucket, p_identifier_hash);
     return true;
   end if;
   if now() - existing.window_started_at >= interval '1 hour' then
-    update public.vote_rate_limits
-    set window_started_at = now(), attempts = 1
+    update public.vote_rate_limits set window_started_at = now(), attempts = 1
     where bucket = p_bucket and identifier_hash = p_identifier_hash;
     return true;
   end if;
-  if existing.attempts >= current_limit then
-    return false;
-  end if;
+  if existing.attempts >= current_limit then return false; end if;
   update public.vote_rate_limits set attempts = attempts + 1
   where bucket = p_bucket and identifier_hash = p_identifier_hash;
   return true;
 end;
 $$;
+
+-- Populate any data that was created before feed/statistics triggers existed.
+insert into public.vote_feed (id, voter_name, gender, created_at)
+select id, voter_name, gender, created_at from public.votes
+on conflict (id) do nothing;
+
+update public.vote_stats
+set lover_count = (select count(*) from public.votes where gender = 'lover'),
+    other_count = (select count(*) from public.votes where gender <> 'lover'),
+    updated_at = now()
+where id = 1;
 
 alter table public.votes enable row level security;
 alter table public.vote_feed enable row level security;
@@ -217,6 +247,8 @@ alter table public.vote_rate_limits enable row level security;
 revoke all on table public.votes, public.vote_feed, public.vote_stats, public.vote_rate_limits from anon, authenticated;
 grant select on public.vote_feed, public.vote_stats to anon, authenticated;
 
+drop policy if exists "public may read the public participant feed" on public.vote_feed;
+drop policy if exists "public may read aggregate vote stats" on public.vote_stats;
 create policy "public may read the public participant feed"
 on public.vote_feed for select to anon, authenticated using (true);
 create policy "public may read aggregate vote stats"
@@ -233,4 +265,19 @@ grant execute on function public.delete_vote_by_name_and_password(text, text) to
 grant execute on function public.admin_delete_vote(uuid) to service_role;
 grant execute on function public.consume_vote_rate_limit(text, text) to service_role;
 
-alter publication supabase_realtime add table public.vote_feed, public.vote_stats;
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'vote_feed'
+  ) then
+    alter publication supabase_realtime add table public.vote_feed;
+  end if;
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'vote_stats'
+  ) then
+    alter publication supabase_realtime add table public.vote_stats;
+  end if;
+end;
+$$;
