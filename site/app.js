@@ -147,7 +147,7 @@ elements.voteForm.addEventListener("submit", async (event) => {
     await callVoteApi({ action: "create", name, gender, password });
     $("#own-delete-name").value = name;
     elements.voteForm.reset();
-    setMessage(elements.voteMessage, "투표가 반영됐어요. 투표번호는 꼭 보관해 주세요.", "success");
+    setMessage(elements.voteMessage, "투표가 반영됐어요. 비밀번호는 꼭 기억해 주세요.", "success");
   } catch (error) {
     setMessage(elements.voteMessage, error.message, "error");
   } finally {

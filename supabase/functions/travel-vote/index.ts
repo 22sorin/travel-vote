@@ -5,9 +5,11 @@ const encoder = new TextEncoder();
 const allowedGenders = new Set(["lover", "cd", "mtf", "tg"]);
 
 function response(payload: Record<string, unknown>, status: number, cors: HeadersInit) {
+  const headers = new Headers(cors);
+  headers.set("Content-Type", "application/json; charset=utf-8");
   return new Response(JSON.stringify(payload), {
     status,
-    headers: { ...cors, "Content-Type": "application/json; charset=utf-8" },
+    headers,
   });
 }
 
