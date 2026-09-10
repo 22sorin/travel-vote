@@ -56,17 +56,13 @@ function renderStats(stats) {
   elements.peopleCount.textContent = `${total.toLocaleString("ko-KR")}명`;
 }
 
-function formatTime(value) {
-  return new Intl.DateTimeFormat("ko-KR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
-}
-
 function renderParticipants() {
   elements.participantList.replaceChildren();
   for (const person of state.participants) {
     const fragment = elements.template.content.cloneNode(true);
     const item = fragment.querySelector("li");
     fragment.querySelector("strong").textContent = person.voter_name;
-    fragment.querySelector(".person-copy span").textContent = `${labels[person.gender] ?? person.gender} · ${formatTime(person.created_at)}`;
+    fragment.querySelector(".person-copy span").textContent = labels[person.gender] ?? person.gender;
     fragment.querySelector(".person-badge").style.background = person.gender === "lover" ? "var(--blue-soft)" : "var(--pink-soft)";
     const adminPick = fragment.querySelector(".admin-pick");
     adminPick.dataset.voteId = person.id;
