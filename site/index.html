@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="제주도 여행 수요조사 실시간 투표"
+    />
+    <title>제주도 여행 수요조사</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Outfit:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page-shell">
+      <section class="hero" aria-labelledby="page-title">
+        <p class="eyebrow">JEJU TRIP · DEMAND CHECK</p>
+        <h1 id="page-title">제주도, 같이 갈래요?</h1>
+        <p class="hero-copy">
+          여행을 원하는 마음을 남겨 주세요. 현황은 모두에게 바로 반영됩니다.
+        </p>
+        <div class="island-line" aria-hidden="true">
+          <span></span><i></i><b></b><i></i><span></span>
+        </div>
+      </section>
+
+      <div id="setup-note" class="setup-note" hidden role="alert">
+        아직 연결 설정이 되지 않았습니다. <code>site/config.js</code>에 Supabase
+        프로젝트 정보를 넣은 뒤 다시 열어 주세요.
+      </div>
+
+      <section class="dashboard" aria-labelledby="results-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">LIVE RESULTS</p>
+            <h2 id="results-title">실시간 투표 현황</h2>
+          </div>
+          <p id="connection-status" class="connection-status" aria-live="polite">
+            연결 준비 중
+          </p>
+        </div>
+
+        <div class="result-layout">
+          <div class="chart-card">
+            <div id="donut" class="donut empty" style="--lover-angle: 0deg" role="img" aria-label="성별 투표 비율 그래프">
+              <div class="donut-center">
+                <strong id="total-count">0</strong>
+                <span>전체 투표자</span>
+              </div>
+            </div>
+            <div class="legend" aria-label="그래프 범례">
+              <div>
+                <span class="legend-dot lover-dot"></span>
+                <span>러버</span>
+                <strong id="lover-percent">0%</strong>
+              </div>
+              <div>
+                <span class="legend-dot other-dot"></span>
+                <span>CD · MTF · TG</span>
+                <strong id="other-percent">0%</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="count-card">
+            <div class="count-row lover-row">
+              <span class="count-label"><i></i>러버</span>
+              <strong id="lover-count">0명</strong>
+              <span id="lover-ratio" class="ratio">0%</span>
+            </div>
+            <div class="bar-track" aria-hidden="true"><span id="lover-bar" class="lover-bar"></span></div>
+            <div class="count-row other-row">
+              <span class="count-label"><i></i>CD · MTF · TG</span>
+              <strong id="other-count">0명</strong>
+              <span id="other-ratio" class="ratio">0%</span>
+            </div>
+            <div class="bar-track" aria-hidden="true"><span id="other-bar" class="other-bar"></span></div>
+            <p class="update-time" id="updated-at">아직 투표가 없습니다</p>
+          </div>
+        </div>
+      </section>
+
+      <div class="content-grid">
+        <section class="panel vote-panel" aria-labelledby="vote-title">
+          <p class="eyebrow">ADD YOUR VOTE</p>
+          <h2 id="vote-title">여행 의사 남기기</h2>
+          <p class="panel-intro">이름과 성별은 참여자 목록에 공개됩니다.</p>
+
+          <form id="vote-form" novalidate>
+            <label for="voter-name">이름</label>
+            <input id="voter-name" name="name" type="text" maxlength="40" autocomplete="name" placeholder="공개할 이름" required />
+
+            <fieldset>
+              <legend>성별 분류</legend>
+              <div class="gender-options">
+                <label><input type="radio" name="gender" value="lover" required /><span>러버</span></label>
+                <label><input type="radio" name="gender" value="cd" /><span>CD</span></label>
+                <label><input type="radio" name="gender" value="mtf" /><span>MTF</span></label>
+                <label><input type="radio" name="gender" value="tg" /><span>TG</span></label>
+              </div>
+            </fieldset>
+
+            <label for="vote-password">내 투표 삭제용 비밀번호</label>
+            <input id="vote-password" name="password" type="password" minlength="4" maxlength="72" autocomplete="new-password" placeholder="4자 이상, 투표 후에도 기억해 주세요" required />
+            <p class="input-hint">비밀번호는 공개되지 않으며, 암호화된 해시만 저장됩니다.</p>
+
+            <button class="primary-button" type="submit">투표하기 <span aria-hidden="true">→</span></button>
+            <p id="vote-message" class="form-message" aria-live="polite"></p>
+          </form>
+        </section>
+
+        <section class="panel people-panel" aria-labelledby="people-title">
+          <div class="people-heading">
+            <div>
+              <p class="eyebrow">WHO'S IN</p>
+              <h2 id="people-title">참여자</h2>
+            </div>
+            <span id="people-count" class="people-count">0명</span>
+          </div>
+          <p class="panel-intro">방금 남겨진 이름과 분류가 실시간으로 표시됩니다.</p>
+          <ul id="participant-list" class="participant-list" aria-live="polite"></ul>
+          <p id="empty-participants" class="empty-state">첫 번째 여행 메이트가 되어 주세요.</p>
+        </section>
+      </div>
+
+      <section class="manage-area" aria-label="투표 관리">
+        <div id="own-vote-card" class="manage-card" hidden>
+          <div>
+            <p class="eyebrow">MY VOTE</p>
+            <h2>내 투표 관리</h2>
+            <p>이 기기에서 만든 투표를 삭제할 수 있습니다. 기기를 바꾸면 아래 투표번호가 필요합니다.</p>
+          </div>
+          <div class="vote-id-box">
+            <label for="own-vote-id">투표번호</label>
+            <div><input id="own-vote-id" readonly /><button id="copy-vote-id" type="button">복사</button></div>
+          </div>
+          <form id="own-delete-form" class="inline-form">
+            <label for="own-delete-password">삭제용 비밀번호</label>
+            <input id="own-delete-password" type="password" minlength="4" maxlength="72" required autocomplete="current-password" />
+            <button class="outline-button" type="submit">내 투표 삭제</button>
+          </form>
+          <p id="own-delete-message" class="form-message" aria-live="polite"></p>
+        </div>
+
+        <section id="admin-console" class="admin-console" hidden aria-label="관리 도구">
+          <p>참여자 카드에서 삭제 대상을 고른 뒤 마스터 비밀번호를 입력하세요.</p>
+          <form id="admin-delete-form" class="admin-form">
+            <label for="admin-vote-id">삭제할 투표번호</label>
+            <input id="admin-vote-id" type="text" placeholder="참여자 목록에서 선택" required />
+            <label for="admin-password">마스터 비밀번호</label>
+            <input id="admin-password" type="password" required autocomplete="current-password" />
+            <button class="danger-button" type="submit">투표 삭제</button>
+          </form>
+          <p id="admin-message" class="form-message" aria-live="polite"></p>
+        </section>
+      </section>
+    </main>
+
+    <template id="participant-template">
+      <li class="participant">
+        <span class="person-badge" aria-hidden="true"></span>
+        <div class="person-copy"><strong></strong><span></span></div>
+        <button class="admin-pick" type="button" hidden>삭제</button>
+      </li>
+    </template>
+
+    <script src="./config.js"></script>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
